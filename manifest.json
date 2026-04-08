@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "ForceProxy",
+  "version": "1.0.0",
+  "description": "Route all traffic through SOCKS5/HTTP/HTTPS proxy or use system default",
+  "permissions": ["proxy", "storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ForceProxy",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
