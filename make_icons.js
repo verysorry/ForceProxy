@@ -1,6 +1,7 @@
 'use strict';
 // Generates minimal PNG icons for ForceProxy
-// Colors: blue circle with white "F" letter
+// Design: white "P" on a blue rounded square — a nod to the European parking
+// sign (P → "proxy"). Blue matches the popup header (#1a73e8).
 // Run once: node make_icons.js
 
 const fs = require('fs');
@@ -9,69 +10,69 @@ const zlib = require('zlib');
 
 function createPNG(size) {
   // Build raw RGBA pixel data
-  const cx = size / 2, cy = size / 2, r = size / 2;
+  const cx = size / 2, cy = size / 2;
+  const half = size / 2;        // full-bleed tile (edges touch the canvas)
+  const radius = size * 0.22;   // rounded-corner radius
   const data = Buffer.alloc(size * size * 4);
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
-      const dx = x - cx + 0.5, dy = y - cy + 0.5;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist <= r - 0.5) {
-        // Blue background: #1a73e8
-        data[idx]     = 0x1a;
-        data[idx + 1] = 0x73;
-        data[idx + 2] = 0xe8;
-        data[idx + 3] = 255;
-      } else if (dist <= r + 0.5) {
-        // Anti-aliased edge
-        const alpha = Math.round((r + 0.5 - dist) * 255);
-        data[idx]     = 0x1a;
-        data[idx + 1] = 0x73;
-        data[idx + 2] = 0xe8;
-        data[idx + 3] = alpha;
-      } else {
-        // Transparent
-        data[idx + 3] = 0;
-      }
+      // Signed distance to the rounded rectangle (negative = inside).
+      const d = roundRectSDF(x + 0.5 - cx, y + 0.5 - cy, half, half, radius);
+      // Coverage across a 1px anti-aliased edge.
+      let cov = 0.5 - d;
+      if (cov <= 0) { data[idx + 3] = 0; continue; } // outside the tile
+      if (cov > 1) cov = 1;                           // fully inside
+      // Blue background: #1a73e8
+      data[idx]     = 0x1a;
+      data[idx + 1] = 0x73;
+      data[idx + 2] = 0xe8;
+      data[idx + 3] = Math.round(cov * 255);
     }
   }
 
-  // Draw white "F" letter
-  drawLetter(data, size);
+  // Draw the white "P"
+  drawP(data, size);
 
   return encodePNG(size, size, data);
 }
 
-function drawLetter(data, size) {
+// Signed distance from point (px,py), measured from the rect center, to a
+// rounded rectangle with half-extents (hx,hy) and corner radius r.
+function roundRectSDF(px, py, hx, hy, r) {
+  const qx = Math.abs(px) - hx + r;
+  const qy = Math.abs(py) - hy + r;
+  const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
+  return Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qx, qy), 0) - r;
+}
+
+function drawP(data, size) {
   const s = size;
-  // Letter "F" proportions scaled to icon size
-  const lw = Math.max(1, Math.round(s * 0.12)); // line width
-  const x0 = Math.round(s * 0.30);
-  const x1 = Math.round(s * 0.70);
-  const y0 = Math.round(s * 0.20);
-  const y1 = Math.round(s * 0.80);
-  const ym = Math.round(s * 0.50);
+  // "P" proportions scaled to icon size.
+  const lw = Math.max(1, Math.round(s * 0.12)); // stroke width
+  const x0 = Math.round(s * 0.30);              // left edge of stem
+  const x1 = Math.round(s * 0.70);              // right edge of bowl
+  const y0 = Math.round(s * 0.17);              // top
+  const y1 = Math.round(s * 0.83);              // bottom of stem
+  const ym = Math.round(s * 0.56);              // bottom of the bowl
 
   function fillRect(rx, ry, rw, rh) {
     for (let y = ry; y < ry + rh && y < s; y++) {
       for (let x = rx; x < rx + rw && x < s; x++) {
         if (x < 0 || y < 0) continue;
         const idx = (y * s + x) * 4;
-        if (data[idx + 3] > 0) { // only inside circle
+        if (data[idx + 3] > 0) { // only paint inside the tile
           data[idx] = 255; data[idx+1] = 255; data[idx+2] = 255; data[idx+3] = 255;
         }
       }
     }
   }
 
-  // Vertical stroke
-  fillRect(x0, y0, lw, y1 - y0);
-  // Top horizontal
-  fillRect(x0, y0, x1 - x0, lw);
-  // Middle horizontal (shorter)
-  fillRect(x0, ym - Math.floor(lw/2), Math.round((x1 - x0) * 0.75), lw);
+  fillRect(x0, y0, lw, y1 - y0);       // vertical stem (full height)
+  fillRect(x0, y0, x1 - x0, lw);       // top bar of the bowl
+  fillRect(x1 - lw, y0, lw, ym - y0);  // right bar of the bowl
+  fillRect(x0, ym - lw, x1 - x0, lw);  // bottom bar (closes the loop; counter stays blue)
 }
 
 function encodePNG(width, height, rgba) {
