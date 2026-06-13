@@ -35,20 +35,30 @@ function clearBadge() {
 
 // ── Proxy control ──────────────────────────────────────────────────────────
 
-async function applyProxy(host, port, type, label) {
-  type = type || 'socks5';
-  log('applyProxy', type, host, port, 'label:', label);
-  await chrome.proxy.settings.set({
-    value: {
+// p is a proxy descriptor, one of:
+//   fixed server → { type: socks5|http|https, host, port, label }
+//   PAC          → { type: 'pac', url, label }
+async function applyProxy(p) {
+  const type = p.type || 'socks5';
+  let value;
+  if (type === 'pac') {
+    // PAC by URL — Chrome fetches the script and runs FindProxyForURL itself.
+    // Chrome's PAC fetcher only accepts http(s)/data: URLs (no file://).
+    // mandatory:false → fall back to Direct if the script is bad/unreachable.
+    log('applyProxy pac', p.url, 'label:', p.label);
+    value = { mode: 'pac_script', pacScript: { url: p.url, mandatory: false } };
+  } else {
+    log('applyProxy', type, p.host, p.port, 'label:', p.label);
+    value = {
       mode: 'fixed_servers',
       rules: {
-        singleProxy: { scheme: type, host, port: parseInt(port, 10) },
+        singleProxy: { scheme: type, host: p.host, port: parseInt(p.port, 10) },
         bypassList: []
       }
-    },
-    scope: 'regular'
-  });
-  setActiveBadge(label);
+    };
+  }
+  await chrome.proxy.settings.set({ value, scope: 'regular' });
+  setActiveBadge(p.label);
   log('applyProxy done');
 }
 
@@ -69,14 +79,16 @@ async function restoreState(reason) {
     if (activeProxy) {
       // Backfill label from the saved proxy list (records stored by older
       // versions have no label, which would otherwise fall back to "ON").
+      // Match by id first, then host+port (legacy records have no id).
       let label = activeProxy.label;
       if (!label && Array.isArray(proxies)) {
         const found = proxies.find(
-          p => p.host === activeProxy.host && String(p.port) === String(activeProxy.port)
+          p => (activeProxy.id && p.id === activeProxy.id) ||
+               (p.host === activeProxy.host && String(p.port) === String(activeProxy.port))
         );
         if (found) label = found.label;
       }
-      await applyProxy(activeProxy.host, activeProxy.port, activeProxy.type, label);
+      await applyProxy({ ...activeProxy, label });
     } else {
       await clearProxy();
     }
@@ -103,7 +115,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     try {
       if (msg.action === 'setProxy') {
-        await applyProxy(msg.host, msg.port, msg.type, msg.label);
+        await applyProxy(msg);
         sendResponse({ ok: true });
 
       } else if (msg.action === 'clearProxy') {

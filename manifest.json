@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ForceProxy",
   "version": "1.0.0",
-  "description": "Route all traffic through SOCKS5/HTTP/HTTPS proxy or use system default",
+  "description": "Route all traffic through a SOCKS5/HTTP/HTTPS proxy or a PAC script, or use system default",
   "permissions": ["proxy", "storage"],
   "action": {
     "default_popup": "popup.html",

@@ -169,10 +169,11 @@
         <option value="socks5" selected>SOCKS5</option>
         <option value="http">HTTP</option>
         <option value="https">HTTPS</option>
+        <option value="pac">PAC (URL)</option>
       </select>
     </div>
     <div class="field">
-      <label>Host : Port</label>
+      <label id="hostport-label">Host : Port</label>
       <div class="host-row">
         <input type="text"   id="new-host" placeholder="127.0.0.1" spellcheck="false" autocomplete="off">
         <input type="number" id="new-port" placeholder="1080" min="1" max="65535">
