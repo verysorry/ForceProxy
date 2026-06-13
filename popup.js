@@ -11,10 +11,12 @@ const newHost  = document.getElementById('new-host');
 const newPort  = document.getElementById('new-port');
 const newType  = document.getElementById('new-type');
 const btnAdd   = document.getElementById('btn-add');
+const titleEl  = document.querySelector('.add-title');
 
 // In-memory state (loaded from storage on init)
 let proxies    = [];   // [{id, label, host, port, type}]
 let activeId   = 'direct'; // 'direct' | proxy id
+let editingId  = null; // proxy id currently loaded into the form for editing, or null
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -83,6 +85,13 @@ function makeRow(id, label, subtitle, active, deletable) {
   row.appendChild(info);
 
   if (deletable) {
+    const edit = document.createElement('button');
+    edit.className = 'btn-edit';
+    edit.title = 'Edit';
+    edit.textContent = '✎';
+    edit.addEventListener('click', (e) => { e.stopPropagation(); onEdit(id); });
+    row.appendChild(edit);
+
     const del = document.createElement('button');
     del.className = 'btn-delete';
     del.title = 'Remove';
@@ -136,9 +145,43 @@ async function onDelete(id) {
     await saveActiveProxy(null);
   }
   proxies = proxies.filter(p => p.id !== id);
+  if (id === editingId) cancelEdit(); // the row being edited is gone
   await saveProxies();
   render();
   setStatus('Proxy removed');
+}
+
+// Load a proxy into the form for editing. Clicking the same row's pencil again
+// toggles edit mode back off.
+function onEdit(id) {
+  if (id === editingId) { cancelEdit(); setStatus(''); return; }
+  const p = proxies.find(x => x.id === id);
+  if (!p) return;
+  log('edit', id);
+  editingId = id;
+  newLabel.value = p.label;
+  newHost.value  = p.host;
+  newPort.value  = p.port;
+  newType.value  = p.type || 'socks5';
+  if (titleEl) titleEl.textContent = 'Edit proxy';
+  btnAdd.textContent = 'Save';
+  newLabel.focus();
+  setStatus('Editing: ' + p.label);
+}
+
+// Leave edit mode and reset the form back to "add" defaults.
+function cancelEdit() {
+  editingId = null;
+  if (titleEl) titleEl.textContent = 'Add proxy';
+  btnAdd.textContent = '+ Add';
+  clearForm();
+}
+
+function clearForm() {
+  newLabel.value = '';
+  newHost.value  = '';
+  newPort.value  = '';
+  newType.value  = 'socks5';
 }
 
 btnAdd.addEventListener('click', async () => {
@@ -151,15 +194,32 @@ btnAdd.addEventListener('click', async () => {
   if (!port || port < 1 || port > 65535) { setStatus('Enter valid port', 'err'); newPort.focus(); return; }
 
   const type = newType.value;
+
+  if (editingId) {
+    // Update the existing proxy in place, preserving its id and list position.
+    const p = proxies.find(x => x.id === editingId);
+    if (p) {
+      Object.assign(p, { label, host, port, type });
+      await saveProxies();
+      // If we just edited the active proxy, re-apply it so the new settings
+      // take effect live and activeProxy stays matched (lookup is by host+port).
+      if (activeId === editingId) {
+        const res = await send({ action: 'setProxy', host, port, type, label });
+        if (!res.ok) { setStatus('Error: ' + res.error, 'err'); return; }
+        await saveActiveProxy({ host, port, type, label });
+      }
+    }
+    log('editProxy', type, label, host, port);
+    cancelEdit();
+    render();
+    setStatus('Saved: ' + label, 'ok');
+    return;
+  }
+
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   proxies.push({ id, label, host, port, type });
   await saveProxies();
-
-  newLabel.value = '';
-  newHost.value  = '';
-  newPort.value  = '';
-  newType.value  = 'socks5';
-
+  clearForm();
   render();
   setStatus('Added: ' + label, 'ok');
   log('addProxy', type, label, host, port);
