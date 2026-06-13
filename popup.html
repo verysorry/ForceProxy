@@ -100,6 +100,17 @@
     }
     .btn-edit:hover { color: #1a73e8; background: #e8f0fe; }
 
+    /* ── Options row ── */
+    .opt-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 12px; color: #444;
+      cursor: pointer; user-select: none;
+    }
+    .opt-row input { cursor: pointer; margin: 0; }
+
     /* ── Add form ── */
     .add-section { padding: 12px 14px; background: #fff; }
 
@@ -153,6 +164,11 @@
     <h1>ForceProxy</h1>
     <div class="dot" id="dot"></div>
   </header>
+
+  <label class="opt-row">
+    <input type="checkbox" id="reset-on-start">
+    <span>Reset to Direct on browser start</span>
+  </label>
 
   <div id="proxy-list"></div>
 

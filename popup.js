@@ -13,6 +13,7 @@ const newType   = document.getElementById('new-type');
 const btnAdd    = document.getElementById('btn-add');
 const titleEl   = document.querySelector('.add-title');
 const hostLabel = document.getElementById('hostport-label');
+const resetOnStart = document.getElementById('reset-on-start');
 
 // In-memory state (loaded from storage on init)
 let proxies    = [];   // [{id, label, type, host, port} | {id, label, type:'pac', url}]
@@ -22,8 +23,9 @@ let editingId  = null; // proxy id currently loaded into the form for editing, o
 // ── Storage ────────────────────────────────────────────────────────────────
 
 async function loadFromStorage() {
-  const data = await chrome.storage.local.get(['proxies', 'activeProxy']);
+  const data = await chrome.storage.local.get(['proxies', 'activeProxy', 'resetOnStartup']);
   proxies  = data.proxies || [];
+  resetOnStart.checked = !!data.resetOnStartup;
   const ap = data.activeProxy;
   if (ap) {
     // Match by id first; fall back to host+port for records saved by older
@@ -147,6 +149,13 @@ function updateFormForType() {
 }
 
 newType.addEventListener('change', updateFormForType);
+
+// "Reset to Direct on browser start" — persisted only; the background worker
+// reads it on startup (onStartup) to decide whether to drop the active proxy.
+resetOnStart.addEventListener('change', async () => {
+  await chrome.storage.local.set({ resetOnStartup: resetOnStart.checked });
+  log('resetOnStartup', resetOnStart.checked);
+});
 
 // ── Actions ────────────────────────────────────────────────────────────────
 

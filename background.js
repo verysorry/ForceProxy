@@ -74,8 +74,20 @@ async function clearProxy() {
 async function restoreState(reason) {
   log('restoreState, reason:', reason);
   try {
-    const { activeProxy, proxies } = await chrome.storage.local.get(['activeProxy', 'proxies']);
-    log('activeProxy:', JSON.stringify(activeProxy));
+    const { activeProxy, proxies, resetOnStartup } =
+      await chrome.storage.local.get(['activeProxy', 'proxies', 'resetOnStartup']);
+    log('activeProxy:', JSON.stringify(activeProxy), 'resetOnStartup:', !!resetOnStartup);
+
+    // "Reset to Direct on browser start": on a real browser launch (onStartup),
+    // drop any active proxy so a proxy left on doesn't carry into the next
+    // session. Only onStartup — not onInstalled (extension update / dev reload).
+    if (reason === 'onStartup' && resetOnStartup && activeProxy) {
+      log('resetOnStartup enabled — clearing active proxy on startup');
+      await chrome.storage.local.set({ activeProxy: null });
+      await clearProxy();
+      return;
+    }
+
     if (activeProxy) {
       // Backfill label from the saved proxy list (records stored by older
       // versions have no label, which would otherwise fall back to "ON").
