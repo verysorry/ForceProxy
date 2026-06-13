@@ -111,14 +111,14 @@ async function onActivate(id) {
   } else {
     const p = proxies.find(x => x.id === id);
     if (!p) { setStatus('Proxy not found', 'err'); return; }
-    res = await send({ action: 'setProxy', host: p.host, port: p.port, type: p.type || 'socks5' });
+    res = await send({ action: 'setProxy', host: p.host, port: p.port, type: p.type || 'socks5', label: p.label });
   }
 
   if (!res.ok) { setStatus('Error: ' + res.error, 'err'); return; }
 
   activeId = id;
   const p = proxies.find(x => x.id === id);
-  await saveActiveProxy(p ? { host: p.host, port: p.port, type: p.type || 'socks5' } : null);
+  await saveActiveProxy(p ? { host: p.host, port: p.port, type: p.type || 'socks5', label: p.label } : null);
 
   render();
   setStatus(id === 'direct'
